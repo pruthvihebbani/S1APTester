@@ -7896,6 +7896,14 @@ PUBLIC S16 ueUiProcErabsInfoMsg(Pst *pst, NbuErabsInfo *pNbuErabsInfo)
    }
    if (pNbuErabsInfo->erabInfo) {
      for (i = 0; i < pNbuErabsInfo->erabInfo->numOfErab; i++) {
+       for (U8 drbIdx = 0; drbIdx < UE_APP_MAX_DRBS; drbIdx++) {
+         if (pNbuErabsInfo->erabInfo->rabCbs[i].erabId ==
+             ueCb->ueRabCb[drbIdx].epsBearerId) {
+           ueCb->drbs[drbIdx + 1] = UE_APP_DRB_INUSE;
+           ++ueCb->numRabs;
+           break;
+         }
+       }
        nasPdu = &pNbuErabsInfo->erabInfo->rabCbs[i].nasPdu;
        /* Decoding the PDU */
        ret = ueAppEdmDecode(nasPdu, &ueEvnt);

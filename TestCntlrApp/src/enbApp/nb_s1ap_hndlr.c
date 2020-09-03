@@ -262,6 +262,7 @@ PUBLIC S16 nbBuildAndSendErabRelInd
 
 PUBLIC S16 nbBuildAndSendErabRelRsp
 (
+ NbUeCb *ueCb,
  U32 enbUeS1apId,
  U32 mmeUeS1apId,
  U8 numOfErabIdsRlsd,
@@ -273,7 +274,6 @@ PUBLIC S16 nbBuildAndSendErabRelRsp
    //SztUDatEvnt uDatEvnt;
    SztDatEvntReq erabRelRsp = {0};
    NbMmeCb *mmeCb = NULLP;
-   NbUeCb *ueCb = NULLP;
    S1apPdu *erabRelPdu = NULLP;
 
    NB_SET_ZERO(&erabRelRsp, sizeof(SztDatEvntReq));
@@ -284,6 +284,11 @@ PUBLIC S16 nbBuildAndSendErabRelRsp
       RETVALUE(RFAILED);
    }
 
+   if (!ueCb) {
+     NB_LOG_ERROR(&nbCb, "UeCb is NULL ");
+     RETVALUE(RFAILED);
+   }
+
    if(nbBldErabRelRsp(&(erabRelPdu), enbUeS1apId, mmeUeS1apId,
             numOfErabIdsRlsd, rlsdErabIdLst, numOfErabIdsRlsFld,
             rlsFldErabLst) != ROK)
@@ -291,14 +296,14 @@ PUBLIC S16 nbBuildAndSendErabRelRsp
       RETVALUE(RFAILED);
    }
 
-
+#if 0
    if ( ROK != (cmHashListFind(&(nbCb.ueCbLst), (U8 *)&enbUeS1apId,
 				   sizeof(U8),0,(PTR *)&ueCb)))
    {
 	   NB_LOG_ERROR(&nbCb, "Failed to Find UeCb");
 	   RETVALUE(RFAILED);
    }
-
+#endif
    NbS1ConCb                 *s1apCon = ueCb->s1ConCb;
    erabRelRsp.spConnId = s1apCon->spConnId;
    erabRelRsp.pdu      = erabRelPdu;
@@ -1202,7 +1207,8 @@ S1apPdu                      *pdu
          nbProcPagingMsg(pdu);
          break;
       case Sztid_E_RABRls:
-         nbProcErabRelCmd(pdu);
+         printf("In nbPrcInitPdu\n");
+         nbProcErabRelCmd(pdu, NULL);
          break;
 #ifdef MULTI_ENB_SUPPORT
       case Sztid_MMEConfigTfr:
@@ -1296,7 +1302,7 @@ PUBLIC S16 nbProcPagingMsg
  *       RFAILED : not able to process the ERAB Release Cmd message due to
  *       memory lack.
  */
-PUBLIC S16 nbProcErabRelCmd(S1apPdu *s1apErabRlsCmd) 
+PUBLIC S16 nbProcErabRelCmd(S1apPdu *s1apErabRlsCmd, NbUeCb *ueCb)
 {
   S16 retVal = ROK;
   U16 numComp = 0;
@@ -1309,7 +1315,6 @@ PUBLIC S16 nbProcErabRelCmd(S1apPdu *s1apErabRlsCmd)
   U32 mmeUeS1apId = 0;
   U8 numOfErabIdsRlsd = 0;
   SztNAS_PDU *nasPdu = NULLP;
-  NbUeCb *ueCb = NULLP;
   NbUeTunInfo *tunInfo = NULLP;
   NbErabRelReq *erabRelReq = NULLP;
 
@@ -1364,10 +1369,15 @@ PUBLIC S16 nbProcErabRelCmd(S1apPdu *s1apErabRlsCmd)
   /*for(cnt = 0; cnt < nbCb.crntUeIdx; cnt++)
   {
   }*/
-  cmHashListFind(&(nbCb.ueCbLst), (U8 *)&(enbUeS1apId), sizeof(U8), 0,
+  printf("ueCb %x\n", ueCb);
+ printf("Before for\n");
+  if (!ueCb) {
+    cmHashListFind(&(nbCb.ueCbLst), (U8 *)&(enbUeS1apId), sizeof(U8), 0,
                  (PTR *)(&ueCb));
+  }
   for (cnt = 0; cnt < numOfErabIdsRlsd; cnt++) {
     U32 bearerId = erabRelCmd.erabIdLst[cnt];
+  printf("Before tunnInfo\n");
     retVal = cmHashListFind(&(ueCb->tunnInfo), (U8 *)&(bearerId), sizeof(U32),
                             0, (PTR *)(&tunInfo));
     if (tunInfo == NULL) {
@@ -1379,7 +1389,7 @@ PUBLIC S16 nbProcErabRelCmd(S1apPdu *s1apErabRlsCmd)
                    erabRelCmd.erabIdLst[cnt]);
     }
   }
-
+  printf("Before sending erabRelReq\n");
   /* Send message to nb dam to delete the packet filters */
   NB_ALLOC(&erabRelReq, sizeof(NbErabRelReq));
   erabRelReq->ueId = ueCb->ueId;
@@ -1392,11 +1402,11 @@ PUBLIC S16 nbProcErabRelCmd(S1apPdu *s1apErabRlsCmd)
 
   if (erabRelCmd.nasPdu.pres == TRUE) {
     /* Need to send to UeApp */
-    retVal = nbSendErabsRelInfo(&erabRelCmd);
+    retVal = nbSendErabsRelInfo(&erabRelCmd, ueCb->ueId);
 
     /* Send Erab Rel Rsp message */
     retVal =
-        nbBuildAndSendErabRelRsp(enbUeS1apId, mmeUeS1apId, numOfErabIdsRlsd,
+        nbBuildAndSendErabRelRsp(ueCb, enbUeS1apId, mmeUeS1apId, numOfErabIdsRlsd,
                                  erabRelCmd.erabIdLst, 0, NULL);
   } else {
     /* Indicate the TFW about the recieved E-RAB Release command. */
@@ -2424,8 +2434,9 @@ PUBLIC S16 nbPrcIncS1apMsg(NbUeCb *ueCb, S1apPdu *pdu, U8 msgType)
 #endif
       }
    } else if (procedureCodeVal == 7 ) {
+      printf(" In nbPrcIncS1apMsg\n");
       NB_LOG_DEBUG(&nbCb,"nbPrcIncS1apMsg(): Handling RAB Release Command message\n");
-      ret = nbProcErabRelCmd(pdu);
+      ret = nbProcErabRelCmd(pdu, ueCb);
       if(ret != ROK)
       {
         NB_LOG_ERROR(&nbCb, "Failed to Send Erab Release command Indiaction "\
