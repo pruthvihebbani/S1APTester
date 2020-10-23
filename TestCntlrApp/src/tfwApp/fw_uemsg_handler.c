@@ -69,6 +69,7 @@
 #include "ss_gen.x"        /* general */
 #include "lfw.x"
 #include "uet.x"
+#include "ue_esm.h"
 #include "nbt.x"
 #include "fw_read_dflcfg.h"
 #include "fw_api_int.x"
@@ -851,6 +852,10 @@ PRIVATE Void fwFillEsmInfo(ue_Esm_Info *fwEsmInfo, UeEsmInfo *esmInfo)
 {
    U8 count;
 
+   FwCb *fwCb = NULLP;
+   FW_GET_CB(fwCb);
+   FW_LOG_ENTERFN(fwCb);
+
    fwEsmInfo->epsBearerId = esmInfo->epsBearerId;
    fwEsmInfo->qos.qci = esmInfo->qos.qci;
    fwEsmInfo->qos.maxBitRateUL = esmInfo->qos.maxBitRateUL;
@@ -866,10 +871,44 @@ PRIVATE Void fwFillEsmInfo(ue_Esm_Info *fwEsmInfo, UeEsmInfo *esmInfo)
          UE_ESM_MAX_LEN_PDN_ADDRESS);
 
    printf("PDN_TYPE: %d\n", fwEsmInfo->pAddr.pdnType);
-   printf("PDN_ADDRESS: %d %d %d %d\n",fwEsmInfo->pAddr.addrInfo[0],
+   switch(fwEsmInfo->pAddr.pdnType) {
+     case CM_ESM_PDN_IPV4: {
+       printf("IPv4 PDN_ADDRESS:%d %d %d %d\n",fwEsmInfo->pAddr.addrInfo[0],
          fwEsmInfo->pAddr.addrInfo[1],
          fwEsmInfo->pAddr.addrInfo[2],
          fwEsmInfo->pAddr.addrInfo[3]);
+       }
+       break;
+     case CM_ESM_PDN_IPV6: {
+       printf("IPv6 interface id: %x %x %x %x %x %x %x %x\n",fwEsmInfo->pAddr.addrInfo[0],
+         fwEsmInfo->pAddr.addrInfo[1],
+         fwEsmInfo->pAddr.addrInfo[2],
+         fwEsmInfo->pAddr.addrInfo[3],
+         fwEsmInfo->pAddr.addrInfo[4],
+         fwEsmInfo->pAddr.addrInfo[5],
+         fwEsmInfo->pAddr.addrInfo[6],
+         fwEsmInfo->pAddr.addrInfo[7]);
+       }
+       break;
+     case CM_ESM_PDN_IPV4V6: {
+       printf("IPv6 interface id: %x %x %x %x %x %x %x %x\n",fwEsmInfo->pAddr.addrInfo[0],
+         fwEsmInfo->pAddr.addrInfo[1],
+         fwEsmInfo->pAddr.addrInfo[2],
+         fwEsmInfo->pAddr.addrInfo[3],
+         fwEsmInfo->pAddr.addrInfo[4],
+         fwEsmInfo->pAddr.addrInfo[5],
+         fwEsmInfo->pAddr.addrInfo[6],
+         fwEsmInfo->pAddr.addrInfo[7]);
+       printf("IPv4 PDN_ADDRESS:%d %d %d %d\n",fwEsmInfo->pAddr.addrInfo[8],
+         fwEsmInfo->pAddr.addrInfo[9],
+         fwEsmInfo->pAddr.addrInfo[10],
+         fwEsmInfo->pAddr.addrInfo[11]);
+       }
+       break;
+       default:
+          FW_LOG_ERROR(fwCb, "Invalid PDN type for bearer %d", esmInfo->epsBearerId);
+          FW_LOG_EXITFNVOID(fwCb);
+     }
 
    fwEsmInfo->apnAmbr.len = esmInfo->apnAmbr.len;
    fwEsmInfo->apnAmbr.dl = esmInfo->apnAmbr.dl;
@@ -1152,10 +1191,46 @@ PRIVATE S16 sendUePdnConRspIndToTstCntlr(UetResponse *uetMsg)
             UE_ESM_MAX_LEN_PDN_ADDRESS);
 
       printf("PDN_TYPE:%d\n", pdnInfo->pAddr.pdnType);
-      printf("PDN_ADDRESS:%d %d %d %d\n",pdnInfo->pAddr.addrInfo[0],
+      switch(pdnInfo->pAddr.pdnType) {
+        case CM_ESM_PDN_IPV4: {
+          printf("IPv4 PDN_ADDRESS:%d %d %d %d\n",pdnInfo->pAddr.addrInfo[0],
             pdnInfo->pAddr.addrInfo[1],
             pdnInfo->pAddr.addrInfo[2],
             pdnInfo->pAddr.addrInfo[3]);
+          }
+          break;
+        case CM_ESM_PDN_IPV6: {
+          printf("IPv6 interface id: %x %x %x %x %x %x %x %x\n",pdnInfo->pAddr.addrInfo[0],
+            pdnInfo->pAddr.addrInfo[1],
+            pdnInfo->pAddr.addrInfo[2],
+            pdnInfo->pAddr.addrInfo[3],
+            pdnInfo->pAddr.addrInfo[4],
+            pdnInfo->pAddr.addrInfo[5],
+            pdnInfo->pAddr.addrInfo[6],
+            pdnInfo->pAddr.addrInfo[7]
+          );
+        }
+        break;
+        case CM_ESM_PDN_IPV4V6: {
+          printf("IPv6 interface id: %x %x %x %x %x %x %x %x\n",pdnInfo->pAddr.addrInfo[0],
+            pdnInfo->pAddr.addrInfo[1],
+            pdnInfo->pAddr.addrInfo[2],
+            pdnInfo->pAddr.addrInfo[3],
+            pdnInfo->pAddr.addrInfo[4],
+            pdnInfo->pAddr.addrInfo[5],
+            pdnInfo->pAddr.addrInfo[6],
+            pdnInfo->pAddr.addrInfo[7]
+          );
+          printf("IPv4 PDN_ADDRESS:%d %d %d %d\n",pdnInfo->pAddr.addrInfo[8],
+            pdnInfo->pAddr.addrInfo[9],
+            pdnInfo->pAddr.addrInfo[10],
+            pdnInfo->pAddr.addrInfo[11]);
+        }
+        break;
+        default:
+          FW_LOG_ERROR(fwCb, "Invalid PDN type for ue %d", uetMsg->msg.ueUetPdnConRsp.ueId);
+          FW_LOG_EXITFN(fwCb, ret);
+     }
    }
    else
    {
